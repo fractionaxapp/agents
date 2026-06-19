@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from fractionax_core import Money
+
 # Tool schemas exposed to Claude. Descriptions are prescriptive about WHEN to call
 # the tool, which improves the model's tool-selection accuracy.
 GET_QUOTE_TOOL: dict[str, Any] = {
@@ -30,10 +32,11 @@ TOOLS: list[dict[str, Any]] = [GET_QUOTE_TOOL]
 
 
 def get_quote(amount: int, currency: str = "USD") -> dict[str, Any]:
-    """Compute a fractional investment quote in integer minor units."""
+    """Compute a fractional investment quote using the shared Money primitive."""
     if amount <= 0:
         raise ValueError("amount must be a positive integer in minor units")
-    return {"amount": amount, "currency": currency.upper()}
+    total = Money(amount, currency)  # shared validation + currency normalization
+    return {"amount": total.amount, "currency": total.currency}
 
 
 def execute_tool(name: str, payload: dict[str, Any]) -> dict[str, Any]:

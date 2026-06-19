@@ -8,6 +8,8 @@ toolchains:
 project:
   name: "agents"
   description: "FractionAX AI agents service (FastAPI + Anthropic Claude)."
+dependsOn:
+  - "py-core"
 
 fileGroups:
   sources:

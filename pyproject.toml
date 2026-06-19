@@ -10,7 +10,13 @@ dependencies = [
   "uvicorn>=0.34",
   "pydantic>=2.11",
   "pydantic-settings>=2.7",
+  "fractionax-core",
 ]
+
+# fractionax-core is the shared Python domain library (libs/py-core in the
+# meta-monorepo). Resolved by path, so develop this service from the meta-repo.
+[tool.uv.sources]
+fractionax-core = { path = "../../libs/py-core", editable = true }
 
 [project.optional-dependencies]
 dev = [
