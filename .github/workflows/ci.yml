@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# This service depends on the monorepo's moon/uv toolchain wiring, so CI runs it
+# inside the fractionaxapp meta-monorepo. Cross-repo access uses the shared GitHub
+# App (org fractionaxapp) that mints a short-lived token at run time. The App ID is
+# not secret (it appears in logs and App settings) so it is inlined; only the
+# private key is an org-level secret: MONOREPO_APP_PRIVATE_KEY (All repositories).
+jobs:
+  ci:
+    name: Lint, format, typecheck, test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Mint a cross-repo token from the GitHub App
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: "4090077"
+          private-key: ${{ secrets.MONOREPO_APP_PRIVATE_KEY }}
+          owner: fractionaxapp
+          repositories: |
+            fractionaxapp
+            ai
+
+      - name: Check out meta-monorepo
+        uses: actions/checkout@v5
+        with:
+          repository: fractionaxapp/fractionaxapp
+          submodules: recursive
+          fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Check out the triggering ai commit
+        run: |
+          cd ai/agents
+          git fetch origin "${AI_SHA}"
+          git checkout "${AI_SHA}"
+        env:
+          AI_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Install proto toolchains
+        uses: moonrepo/setup-toolchain@v0
+        with:
+          auto-install: true
+
+      - name: Run agents quality gates
+        run: moon run agents:lint agents:format agents:typecheck agents:test
