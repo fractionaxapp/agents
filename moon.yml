@@ -1,0 +1,58 @@
+# yaml-language-server: $schema=https://moonrepo.dev/schemas/project.json
+layer: "application"
+language: "python"
+stack: "backend"
+tags: ["py", "ai", "agents"]
+toolchains:
+  default: ["python"]
+project:
+  name: "agents"
+  description: "FractionAX AI agents service (FastAPI + Anthropic Claude)."
+
+fileGroups:
+  sources:
+    - "src/**/*"
+  tests:
+    - "tests/**/*"
+
+# uv manages the virtualenv, so tasks are toolchain-agnostic.
+tasks:
+  install:
+    command: "uv sync --all-extras"
+    inputs:
+      - "pyproject.toml"
+  dev:
+    command: "uv run uvicorn fractionax_agents.server:app --reload --host 0.0.0.0 --port 8000"
+    preset: "server"
+    deps:
+      - "~:install"
+  test:
+    command: "uv run pytest"
+    deps:
+      - "~:install"
+    inputs:
+      - "@group(sources)"
+      - "@group(tests)"
+      - "pyproject.toml"
+  lint:
+    command: "uv run ruff check ."
+    deps:
+      - "~:install"
+    inputs:
+      - "@group(sources)"
+      - "@group(tests)"
+      - "pyproject.toml"
+  format:
+    command: "uv run ruff format --check ."
+    deps:
+      - "~:install"
+    inputs:
+      - "@group(sources)"
+      - "@group(tests)"
+  typecheck:
+    command: "uv run mypy src"
+    deps:
+      - "~:install"
+    inputs:
+      - "@group(sources)"
+      - "pyproject.toml"
