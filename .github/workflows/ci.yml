@@ -26,9 +26,12 @@ jobs:
           app-id: "4090077"
           private-key: ${{ secrets.MONOREPO_APP_PRIVATE_KEY }}
           owner: fractionaxapp
+          # The meta-repo checkout is recursive: fractionaxapp → ai (umbrella) →
+          # agents (this repo). The token must reach all three.
           repositories: |
             fractionaxapp
             ai
+            agents
 
       - name: Check out meta-monorepo
         uses: actions/checkout@v5
@@ -38,13 +41,14 @@ jobs:
           fetch-depth: 0
           token: ${{ steps.app-token.outputs.token }}
 
-      - name: Check out the triggering ai commit
+      - name: Check out the triggering agents commit
+        # The agents service is nested at ai/agents (ai umbrella → agents submodule).
         run: |
           cd ai/agents
-          git fetch origin "${AI_SHA}"
-          git checkout "${AI_SHA}"
+          git fetch origin "${AGENTS_SHA}"
+          git checkout "${AGENTS_SHA}"
         env:
-          AI_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          AGENTS_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Install proto toolchains
         uses: moonrepo/setup-toolchain@v0

@@ -4,8 +4,10 @@ FractionAX AI agents service — [FastAPI](https://fastapi.tiangolo.com) + the
 [Anthropic Claude](https://platform.claude.com) Python SDK, managed with
 [uv](https://docs.astral.sh/uv/).
 
-> **This repo is a submodule** of the [`fractionaxapp`](https://github.com/fractionaxapp/fractionaxapp)
-> meta-monorepo and is developed from there.
+> **This repo is a submodule** of the [`ai`](https://github.com/fractionaxapp/ai) umbrella
+> repo, which is itself a submodule of the
+> [`fractionaxapp`](https://github.com/fractionaxapp/fractionaxapp) meta-monorepo. It is
+> developed from the meta-repo, where it is mounted at `ai/agents`.
 
 ## What it is
 
