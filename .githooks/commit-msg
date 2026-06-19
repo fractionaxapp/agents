@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+# Enforce Conventional Commits (https://www.conventionalcommits.org) with a
+# sentence-case subject. Dependency-free so it works in every repo — Node and
+# Python alike. Enable it with: git config core.hooksPath .githooks
+# (scripts/setup-hooks.sh does this for the meta-repo and all submodules).
+
+msg_file="$1"
+# First non-comment, non-blank line is the header.
+header="$(grep -vE '^[[:space:]]*#' "$msg_file" | sed '/^[[:space:]]*$/d' | head -n1)"
+
+# Let git's own machinery (merges, reverts, fixups, amend-squashes) through.
+case "$header" in
+  "Merge "* | "Revert "* | "fixup!"* | "squash!"* | "amend!"*) exit 0 ;;
+esac
+
+types='feat|fix|chore|docs|refactor|test|ci|build|perf|style|revert'
+# <type>(<scope>)!: <Subject> — scope optional & lowercase, subject starts uppercase.
+pattern="^(${types})(\([a-z0-9._/-]+\))?!?: [A-Z].+"
+
+reject() {
+  echo "✗ Invalid commit message:" >&2
+  echo "    ${header:-<empty>}" >&2
+  echo >&2
+  echo "  $1" >&2
+  echo >&2
+  echo "  Format:  <type>(<scope>): <Sentence-case subject>" >&2
+  echo "  Types:   feat fix chore docs refactor test ci build perf style revert" >&2
+  echo "  Example: feat(api): Add the quote endpoint" >&2
+  exit 1
+}
+
+[[ "$header" =~ $pattern ]] || reject "Must be <type>(<scope>): <Subject>, subject starting with a capital letter."
+
+if (( ${#header} > 100 )); then
+  reject "Header is ${#header} characters; keep it under 100."
+fi
+
+case "$header" in
+  *.) reject "Subject must not end with a period." ;;
+esac
