@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
   "anthropic>=0.69",
+  "openai>=1.50",  # MiniMax failover via its OpenAI-compatible API
   "fastapi>=0.115",
   "uvicorn>=0.34",
   "pydantic>=2.11",

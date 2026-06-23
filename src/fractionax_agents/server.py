@@ -26,10 +26,11 @@ class CopilotRequest(BaseModel):
 
 
 def _require_api_key() -> None:
-    if not get_settings().anthropic_api_key:
+    settings = get_settings()
+    if not (settings.anthropic_api_key or settings.minimax_api_key):
         raise HTTPException(
             status_code=503,
-            detail="Agent not configured: missing ANTHROPIC_API_KEY",
+            detail="Agent not configured: set ANTHROPIC_API_KEY and/or MINIMAX_API_KEY",
         )
 
 
