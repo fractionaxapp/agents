@@ -7,6 +7,7 @@ requires-python = ">=3.13"
 dependencies = [
   "anthropic>=0.69",
   "openai>=1.50",  # MiniMax failover via its OpenAI-compatible API
+  "httpx>=0.28",  # Pyth Hermes price-feed client
   "fastapi>=0.115",
   "uvicorn>=0.34",
   "pydantic>=2.11",

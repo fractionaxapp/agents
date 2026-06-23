@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 from fastapi import FastAPI, HTTPException
-from fractionax_core import Deal, DealFilter
+from fractionax_core import Deal, DealFilter, NavQuote
 from pydantic import BaseModel
 
 from .agent import run_agent
 from .config import get_settings
 from .copilot import CopilotResult, run_copilot
-from .deals import source_deals
+from .deals import ASSETS_BY_ID, SEED_ASSETS, source_deals
+from .oracle import get_nav_oracle
 
 app = FastAPI(title="FractionAX Agents", version="0.0.0")
 
@@ -66,3 +67,15 @@ def deals(
             min_yield_pct=min_yield_pct,
         )
     )
+
+
+@app.get("/nav", response_model=list[NavQuote])
+def nav(asset_id: str | None = None) -> list[NavQuote]:
+    """NAV quotes from the pricing oracle, for one asset or the whole catalogue."""
+    oracle = get_nav_oracle()
+    if asset_id is not None:
+        asset = ASSETS_BY_ID.get(asset_id)
+        if asset is None:
+            raise HTTPException(status_code=404, detail=f"Unknown asset: {asset_id}")
+        return [oracle.quote(asset)]
+    return [oracle.quote(a) for a in SEED_ASSETS]

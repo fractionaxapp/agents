@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from functools import lru_cache
+from typing import Literal
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -21,6 +22,12 @@ class Settings(BaseSettings):
     minimax_api_key: str | None = None
     minimax_model: str = "MiniMax-M2"
     minimax_base_url: str = "https://api.minimax.io/v1"
+
+    # NAV oracle: 'fundamental' values assets from their cash flows (default);
+    # 'pyth' reads live price feeds for tokenized assets; 'switchboard' is future.
+    nav_oracle_provider: Literal["fundamental", "pyth", "switchboard"] = "fundamental"
+    pyth_hermes_url: str = "https://hermes.pyth.network"
+    pyth_feeds: dict[str, str] = {}  # asset_id -> Pyth price feed id
 
     host: str = "0.0.0.0"
     port: int = 8000
