@@ -92,6 +92,7 @@ def _extract_anthropic[T: BaseModel](
     response = client.messages.create(
         model=settings.agent_model,
         max_tokens=settings.max_tokens,
+        temperature=0,  # deterministic field extraction
         system=system,
         tools=cast("list[ToolParam]", [tool]),
         tool_choice={"type": "tool", "name": tool_name},
@@ -126,6 +127,7 @@ def _extract_minimax[T: BaseModel](
     response = client.chat.completions.create(
         model=settings.minimax_model,
         max_tokens=settings.max_tokens,
+        temperature=0,  # deterministic field extraction
         messages=[
             {"role": "system", "content": system},
             {"role": "user", "content": user},
