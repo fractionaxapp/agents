@@ -1,12 +1,16 @@
 from __future__ import annotations
 
+import json
+from collections.abc import Iterator
+
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import StreamingResponse
 from fractionax_core import Deal, DealFilter, NavQuote
 from pydantic import BaseModel
 
 from .agent import run_agent
 from .config import get_settings
-from .copilot import CopilotResult, run_copilot
+from .copilot import CopilotResult, run_copilot, stream_copilot
 from .deals import ASSETS_BY_ID, SEED_ASSETS, source_deals
 from .oracle import get_nav_oracle
 
@@ -51,6 +55,28 @@ def copilot(request: CopilotRequest) -> CopilotResult:
     """Natural language -> structured intent -> matching deals -> investment memo."""
     _require_api_key()
     return run_copilot(request.message, with_memo=request.with_memo)
+
+
+def _sse(event: str, payload: object) -> str:
+    return f"event: {event}\ndata: {json.dumps(payload)}\n\n"
+
+
+@app.post("/copilot/stream")
+def copilot_stream(request: CopilotRequest) -> StreamingResponse:
+    """Stream the Copilot pipeline stage by stage as Server-Sent Events.
+
+    Emits `intent`, then `deals`, then `memo`, then `done` (or a terminal `error`).
+    """
+    _require_api_key()
+
+    def gen() -> Iterator[str]:
+        try:
+            for event, payload in stream_copilot(request.message, with_memo=request.with_memo):
+                yield _sse(event, payload)
+        except Exception as exc:  # surface failures as a terminal SSE event
+            yield _sse("error", {"error": str(exc)})
+
+    return StreamingResponse(gen(), media_type="text/event-stream")
 
 
 @app.get("/deals", response_model=list[Deal])

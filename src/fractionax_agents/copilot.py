@@ -10,6 +10,7 @@ the best match via the Underwriting Agent.
 from __future__ import annotations
 
 import re
+from collections.abc import Iterator
 from typing import Any
 
 from fractionax_core import Deal, DealFilter, InvestmentIntent, InvestmentMemo
@@ -174,3 +175,23 @@ def run_copilot(message: str, *, with_memo: bool = True) -> CopilotResult:
             memo = generate_memo(top, asset)
 
     return CopilotResult(intent=intent, deals=deals, memo=memo)
+
+
+def stream_copilot(message: str, *, with_memo: bool = True) -> Iterator[tuple[str, Any]]:
+    """Yield ``(event, payload)`` as each Copilot stage completes.
+
+    Drives the SSE endpoint so the UI shows the parsed intent immediately, then the
+    matching deals, then the memo (the slow LLM step) when it is ready.
+    """
+    intent = parse_intent(message)
+    yield "intent", intent.model_dump()
+
+    deals = source_deals(intent_to_filter(intent))
+    yield "deals", [d.model_dump() for d in deals]
+
+    if with_memo and deals and intent.action in ("invest", "discover"):
+        asset = ASSETS_BY_ID.get(deals[0].asset_id)
+        if asset is not None:
+            yield "memo", generate_memo(deals[0], asset).model_dump()
+
+    yield "done", {}

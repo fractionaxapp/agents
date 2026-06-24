@@ -39,6 +39,12 @@ def test_copilot_requires_configuration(monkeypatch: pytest.MonkeyPatch) -> None
     assert resp.status_code == 503
 
 
+def test_copilot_stream_requires_configuration(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("fractionax_agents.server.get_settings", _no_provider_settings)
+    resp = client.post("/copilot/stream", json={"message": "x"})
+    assert resp.status_code == 503
+
+
 def test_enrich_fills_fields_the_model_missed() -> None:
     # The model returned only action + amount; the backstop fills the rest.
     bare = InvestmentIntent(action="invest", amount_minor=100_000)
