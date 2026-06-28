@@ -6,8 +6,25 @@ calls to narrow opportunities by the user's intent.
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 from fractionax_core import Asset, Deal, DealFilter
 from fractionax_core.domain import InvoiceAsset, IpRoyaltyAsset, RevenueShareAsset
+
+# A dated rwa.xyz snapshot used to seed the discovery catalogue for the demo
+# (these deals have no backing Asset, so they list but don't generate a memo).
+# Replaced by a licensed live connector in Milestone 2.
+_SEED_FILE = Path(__file__).with_name("seed_deals.json")
+
+
+def _load_catalogue_seed() -> list[Deal]:
+    if not _SEED_FILE.exists():
+        return []
+    try:
+        return [Deal(**row) for row in json.loads(_SEED_FILE.read_text())]
+    except (ValueError, OSError):
+        return []
 
 # --- Seed assets (one per supported alternative-asset class) ---------------
 
@@ -130,6 +147,9 @@ SEED_DEALS: list[Deal] = [
         sourced_at="2026-06-22T00:00:00Z",
     ),
 ]
+
+# Append the dated catalogue snapshot (rwa.xyz) so deal discovery is populated.
+SEED_DEALS += _load_catalogue_seed()
 
 
 def source_deals(deal_filter: DealFilter | None = None) -> list[Deal]:
