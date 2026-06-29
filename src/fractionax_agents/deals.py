@@ -10,21 +10,53 @@ import json
 from pathlib import Path
 
 from fractionax_core import Asset, Deal, DealFilter
-from fractionax_core.domain import InvoiceAsset, IpRoyaltyAsset, RevenueShareAsset
+from fractionax_core.domain import InvoiceAsset, IpRoyaltyAsset, RevenueShareAsset, RiskTier
 
-# A dated rwa.xyz snapshot used to seed the discovery catalogue for the demo
-# (these deals have no backing Asset, so they list but don't generate a memo).
-# Replaced by a licensed live connector in Milestone 2.
+# A dated rwa.xyz snapshot used to seed the discovery catalogue for the demo.
+# These deals have no backing Asset; the Copilot underwrites them from a
+# deal-implied NAV. Replaced by a licensed live connector in Milestone 2.
 _SEED_FILE = Path(__file__).with_name("seed_deals.json")
+
+# The seed's risk_tier is a class-level anchor (assigned from the asset class).
+# Refine it with per-deal signals so deals within a class aren't uniform, capping
+# the move at one tier so the class stays the dominant signal. (A coarse stand-in
+# until the licensed feed carries real per-issuer risk.)
+_RISK_TIERS: tuple[RiskTier, ...] = ("low", "medium", "high")
+_NO_AUM_RAISE_MINOR = 1_000_000  # $10k floor — used when the source disclosed no AUM
+_ESTABLISHED_RAISE_MINOR = 10_000_000_000  # >= $100M: larger, more liquid/established
+_HIGH_YIELD_PCT = 10.0
+
+
+def _refine_risk(base: RiskTier, yield_pct: float, target_raise_minor: int) -> RiskTier:
+    """Nudge a class-anchored risk tier by per-deal signals (≤ one tier of movement):
+    a high projected yield or an undisclosed/opaque size reads riskier; a large,
+    more-established offering reads safer."""
+    delta = 0
+    if yield_pct >= _HIGH_YIELD_PCT:
+        delta += 1
+    if target_raise_minor <= _NO_AUM_RAISE_MINOR:
+        delta += 1
+    elif target_raise_minor >= _ESTABLISHED_RAISE_MINOR:
+        delta -= 1
+    delta = max(-1, min(1, delta))
+    return _RISK_TIERS[max(0, min(len(_RISK_TIERS) - 1, _RISK_TIERS.index(base) + delta))]
 
 
 def _load_catalogue_seed() -> list[Deal]:
     if not _SEED_FILE.exists():
         return []
     try:
-        return [Deal(**row) for row in json.loads(_SEED_FILE.read_text())]
+        deals = [Deal(**row) for row in json.loads(_SEED_FILE.read_text())]
     except (ValueError, OSError):
         return []
+    return [
+        d.model_copy(
+            update={
+                "risk_tier": _refine_risk(d.risk_tier, d.projected_yield_pct, d.target_raise_minor)
+            }
+        )
+        for d in deals
+    ]
 
 # --- Seed assets (one per supported alternative-asset class) ---------------
 
