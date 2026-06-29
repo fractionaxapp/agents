@@ -84,6 +84,7 @@ SEED_DEALS: list[Deal] = [
     Deal(
         id="deal_catalog_a",
         asset_id="ast_catalog_a",
+        asset_class="specialty-finance",
         title="Music catalogue A — royalty participation",
         jurisdiction="US",
         currency="USD",
@@ -97,6 +98,7 @@ SEED_DEALS: list[Deal] = [
     Deal(
         id="deal_patent_my",
         asset_id="ast_patent_my",
+        asset_class="specialty-finance",
         title="Agritech patent licence — Malaysia",
         jurisdiction="MY",
         currency="USD",
@@ -110,6 +112,7 @@ SEED_DEALS: list[Deal] = [
     Deal(
         id="deal_invoice_sg",
         asset_id="ast_invoice_sg",
+        asset_class="asset-backed-credit",
         title="Logistics receivable — Singapore",
         jurisdiction="SG",
         currency="USD",
@@ -123,6 +126,7 @@ SEED_DEALS: list[Deal] = [
     Deal(
         id="deal_invoice_us",
         asset_id="ast_invoice_us",
+        asset_class="asset-backed-credit",
         title="SaaS receivable — United States",
         jurisdiction="US",
         currency="USD",
@@ -136,6 +140,7 @@ SEED_DEALS: list[Deal] = [
     Deal(
         id="deal_revshare_my",
         asset_id="ast_revshare_my",
+        asset_class="specialty-finance",
         title="F&B franchise revenue share — Malaysia",
         jurisdiction="MY",
         currency="USD",
