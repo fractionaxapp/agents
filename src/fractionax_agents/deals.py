@@ -78,83 +78,10 @@ SEED_ASSETS: list[Asset] = [
 
 ASSETS_BY_ID: dict[str, Asset] = {a.id: a for a in SEED_ASSETS}
 
-# --- Seed deals (investable wrappers around the assets) ---------------------
+# --- Seed deals -------------------------------------------------------------
+# Deal discovery is served entirely from the dated rwa.xyz catalogue snapshot.
 
-SEED_DEALS: list[Deal] = [
-    Deal(
-        id="deal_catalog_a",
-        asset_id="ast_catalog_a",
-        asset_class="specialty-finance",
-        title="Music catalogue A — royalty participation",
-        jurisdiction="US",
-        currency="USD",
-        min_investment_minor=100_000,  # $1,000
-        target_raise_minor=4_000_000,
-        projected_yield_pct=8.5,
-        risk_tier="low",
-        status="open",
-        sourced_at="2026-06-20T00:00:00Z",
-    ),
-    Deal(
-        id="deal_patent_my",
-        asset_id="ast_patent_my",
-        asset_class="specialty-finance",
-        title="Agritech patent licence — Malaysia",
-        jurisdiction="MY",
-        currency="USD",
-        min_investment_minor=100_000,  # $1,000
-        target_raise_minor=2_500_000,
-        projected_yield_pct=7.2,
-        risk_tier="low",
-        status="open",
-        sourced_at="2026-06-21T00:00:00Z",
-    ),
-    Deal(
-        id="deal_invoice_sg",
-        asset_id="ast_invoice_sg",
-        asset_class="asset-backed-credit",
-        title="Logistics receivable — Singapore",
-        jurisdiction="SG",
-        currency="USD",
-        min_investment_minor=50_000,  # $500
-        target_raise_minor=5_000_000,
-        projected_yield_pct=11.0,
-        risk_tier="medium",
-        status="open",
-        sourced_at="2026-06-21T00:00:00Z",
-    ),
-    Deal(
-        id="deal_invoice_us",
-        asset_id="ast_invoice_us",
-        asset_class="asset-backed-credit",
-        title="SaaS receivable — United States",
-        jurisdiction="US",
-        currency="USD",
-        min_investment_minor=200_000,  # $2,000
-        target_raise_minor=8_000_000,
-        projected_yield_pct=10.0,
-        risk_tier="medium",
-        status="open",
-        sourced_at="2026-06-22T00:00:00Z",
-    ),
-    Deal(
-        id="deal_revshare_my",
-        asset_id="ast_revshare_my",
-        asset_class="specialty-finance",
-        title="F&B franchise revenue share — Malaysia",
-        jurisdiction="MY",
-        currency="USD",
-        min_investment_minor=25_000,  # $250
-        target_raise_minor=3_000_000,
-        projected_yield_pct=18.0,
-        risk_tier="high",
-        status="open",
-        sourced_at="2026-06-22T00:00:00Z",
-    ),
-]
-
-# Append the dated catalogue snapshot (rwa.xyz) so deal discovery is populated.
-SEED_DEALS += _load_catalogue_seed()
+SEED_DEALS: list[Deal] = _load_catalogue_seed()
 
 
 def source_deals(deal_filter: DealFilter | None = None) -> list[Deal]:
