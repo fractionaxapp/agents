@@ -19,7 +19,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Any, Protocol
 
-from fractionax_core import Asset, NavQuote
+from fractionax_core import Asset, Deal, NavQuote
 from fractionax_core.domain import (
     InvoiceAsset,
     IpRoyaltyAsset,
@@ -68,6 +68,18 @@ def _fundamental_nav_minor(asset: Asset, as_of: date) -> int:
 def illiquidity_adjusted_valuation(nav_minor: int, risk_tier: RiskTier) -> int:
     """Haircut a gross NAV for illiquidity/lock-up, by risk tier."""
     return round(nav_minor * (1 - _ILLIQUIDITY_DISCOUNT[risk_tier]))
+
+
+def deal_implied_nav_minor(deal: Deal) -> int:
+    """Gross NAV proxy for a catalogue deal that has no typed asset to price.
+
+    A tokenised offering is issued at par against its underlying pool, so the target
+    raise is the natural gross NAV. The same illiquidity haircut as the asset-backed
+    path then yields the fair valuation, and the underwriting memo reasons about the
+    deal's projected yield and risk around that anchor. Used when discovery surfaces
+    catalogue deals (which carry no fundamental cash-flow inputs to discount).
+    """
+    return deal.target_raise_minor
 
 
 def _as_of_iso(as_of: date) -> str:

@@ -219,9 +219,9 @@ def run_copilot(message: str, *, with_memo: bool = True) -> CopilotResult:
     memo: InvestmentMemo | None = None
     if with_memo and deals and intent.action in ("invest", "discover"):
         top = deals[0]
-        asset = ASSETS_BY_ID.get(top.asset_id)
-        if asset is not None:
-            memo = generate_memo(top, asset)
+        # Underwrite the top match. Catalogue deals have no typed asset, so the memo
+        # falls back to the deal-implied (par) NAV inside generate_memo.
+        memo = generate_memo(top, ASSETS_BY_ID.get(top.asset_id))
 
     return CopilotResult(intent=intent, deals=deals, memo=memo)
 
@@ -239,8 +239,7 @@ def stream_copilot(message: str, *, with_memo: bool = True) -> Iterator[tuple[st
     yield "deals", [d.model_dump() for d in deals]
 
     if with_memo and deals and intent.action in ("invest", "discover"):
-        asset = ASSETS_BY_ID.get(deals[0].asset_id)
-        if asset is not None:
-            yield "memo", generate_memo(deals[0], asset).model_dump()
+        top = deals[0]
+        yield "memo", generate_memo(top, ASSETS_BY_ID.get(top.asset_id)).model_dump()
 
     yield "done", {}
