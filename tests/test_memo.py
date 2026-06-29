@@ -4,9 +4,9 @@ figure, never whatever the LLM happens to return."""
 from __future__ import annotations
 
 import pytest
-from fractionax_core.domain import InvestmentMemo, MemoRisk
+from fractionax_core.domain import Deal, InvestmentMemo, MemoRisk
 
-from fractionax_agents.deals import ASSETS_BY_ID, SEED_DEALS
+from fractionax_agents.deals import SEED_ASSETS
 from fractionax_agents.memo import generate_memo
 from fractionax_agents.oracle import FundamentalNavOracle, illiquidity_adjusted_valuation
 
@@ -28,8 +28,23 @@ def _fake_memo(**_: object) -> InvestmentMemo:
 def test_memo_valuation_is_nav_derived_not_llm(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("fractionax_agents.memo.extract", _fake_memo)
 
-    deal = SEED_DEALS[0]
-    asset = ASSETS_BY_ID[deal.asset_id]
+    # Discovery is catalogue-only now, so pair a demo asset with a constructed deal
+    # to exercise the NAV-derived valuation path.
+    asset = SEED_ASSETS[0]
+    deal = Deal(
+        id="deal_memo_test",
+        asset_id=asset.id,
+        asset_class="specialty-finance",
+        title=f"Memo test — {asset.name}",
+        jurisdiction=asset.jurisdiction,
+        currency=asset.currency,
+        min_investment_minor=100_000,
+        target_raise_minor=4_000_000,
+        projected_yield_pct=8.5,
+        risk_tier="low",
+        status="open",
+        sourced_at="2026-06-25T00:00:00Z",
+    )
     oracle = FundamentalNavOracle()
     expected = illiquidity_adjusted_valuation(oracle.quote(asset).nav_minor, deal.risk_tier)
 

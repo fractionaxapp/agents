@@ -39,22 +39,34 @@ INTENT_SYSTEM = (
     "-> US, United Kingdom/UK/British -> GB, Indonesia/Indonesian -> ID, "
     "Thailand/Thai -> TH. Set it whenever a place is named.\n"
     "- risk_tier: 'low' for low-risk/safe/conservative/stable/defensive; 'medium' for "
-    "balanced/moderate; 'high' for high-risk/high-yield/aggressive/risky/high-return. "
-    "Set it whenever risk or yield appetite is implied.\n"
-    "- asset_kind: 'ip_royalty' for royalties/IP/music catalogues/patents/licences; "
-    "'invoice' for invoices/receivables/factoring; 'revenue_share' for "
-    "revenue-share/rev-share/franchise-revenue deals. Set it when the asset type "
-    "is implied.\n"
+    "balanced/moderate; 'high' for high-risk/aggressive/risky/speculative. Risk means "
+    "volatility, NOT yield — never infer risk from 'high-yield' or 'high-return' wording "
+    "(that is a yield signal, handled below). Set it only when risk appetite is implied.\n"
+    "- min_yield_pct: minimum projected annual yield as a number, ONLY when the user "
+    "states an explicit floor: 'at least/minimum/over/above N%' -> min_yield_pct=N. A "
+    "vague 'high-yield'/'high-return' with no number sets NO floor (results already sort "
+    "yield-high-first).\n"
+    "- asset_class: one of these exact slugs — stocks, stablecoins, real-estate, "
+    "us-treasury-debt, commodities, corporate-credit, asset-backed-credit, private-equity, "
+    "venture-capital, specialty-finance. Map: property/real estate -> real-estate; "
+    "stablecoin -> stablecoins; treasury/t-bill/government bond -> us-treasury-debt; "
+    "stock/equity/shares -> stocks; commodity/gold/metal -> commodities; corporate/private "
+    "credit/loan/bond -> corporate-credit; invoice/receivable/factoring/trade finance -> "
+    "asset-backed-credit; private equity/buyout -> private-equity; venture/startup -> "
+    "venture-capital; revenue-share/royalty/IP/music/patent/licence -> specialty-finance. "
+    "Set it whenever an asset type is named.\n"
+    "- asset_kind: legacy hint; set when clear (royalties/IP -> ip_royalty, invoices -> "
+    "invoice, revenue-share -> revenue_share) but prefer asset_class for filtering.\n"
     "\n"
     "Examples:\n"
     "- 'Invest $1,000 in low-risk Malaysian opportunities' -> action=invest, "
     "amount_minor=100000, currency=USD, jurisdiction=MY, risk_tier=low.\n"
-    "- 'Show me high-yield revenue-share deals' -> action=discover, risk_tier=high, "
-    "asset_kind=revenue_share.\n"
-    "- 'Discover invoice deals in Singapore' -> action=discover, asset_kind=invoice, "
-    "jurisdiction=SG.\n"
-    "- 'How much for $500 of a music catalogue?' -> action=quote, amount_minor=50000, "
-    "currency=USD, asset_kind=ip_royalty.\n"
+    "- 'Show me high-yield revenue-share deals with minimum 2% yield' -> action=discover, "
+    "asset_class=specialty-finance, min_yield_pct=2.\n"
+    "- 'Discover invoice deals in Singapore' -> action=discover, "
+    "asset_class=asset-backed-credit, jurisdiction=SG.\n"
+    "- 'Safe US treasury deals yielding over 4%' -> action=discover, jurisdiction=US, "
+    "risk_tier=low, asset_class=us-treasury-debt, min_yield_pct=4.\n"
     "Leave a field null only when the message gives no signal for it."
 )
 
@@ -81,12 +93,33 @@ _COUNTRY_TO_ISO: dict[str, str] = {
 }  # fmt: skip
 _RISK_KEYWORDS: dict[str, tuple[str, ...]] = {
     "low": ("low-risk", "low risk", "safe", "conservative", "stable", "defensive"),
-    "high": (
-        "high-risk", "high risk", "high-yield", "high yield",
-        "aggressive", "risky", "high-return", "high return",
-    ),
+    # Yield words (high-yield/high-return) are deliberately NOT here — they signal a
+    # yield floor, not risk; they are handled by _YIELD_RE / min_yield_pct below.
+    "high": ("high-risk", "high risk", "aggressive", "risky", "speculative"),
     "medium": ("medium-risk", "medium risk", "balanced", "moderate"),
 }  # fmt: skip
+_CLASS_KEYWORDS: dict[str, tuple[str, ...]] = {
+    "real-estate": ("real estate", "real-estate", "property", "properties"),
+    "stablecoins": ("stablecoin", "stable coin"),
+    "us-treasury-debt": ("treasury", "treasuries", "t-bill", "government bond", "govt bond"),
+    "stocks": ("stock", "stocks", "equity", "equities", "shares"),
+    "commodities": ("commodity", "commodities", "gold", "silver", "precious metal"),
+    "asset-backed-credit": ("invoice", "receivable", "factoring", "trade finance", "asset-backed"),
+    "private-equity": ("private equity", "buyout"),
+    "venture-capital": ("venture capital", "venture-capital", "vc deal", "startup"),
+    "corporate-credit": ("corporate credit", "private credit", "corporate bond", "corporate loan"),
+    "specialty-finance": (
+        "revenue share", "revenue-share", "rev share", "rev-share", "franchise revenue",
+        "royalty", "royalties", "intellectual property",
+        "music catalog", "music catalogue", "patent", "licence", "license",
+    ),
+}  # fmt: skip
+# "minimum 2%", "at least 4%", "over 5%", or "2% yield"/"4% return"/"5% apy".
+_YIELD_RE = re.compile(
+    r"(?:min(?:imum)?|at\s+least|over|above|>=?)\s*(\d+(?:\.\d+)?)\s*%"
+    r"|(\d+(?:\.\d+)?)\s*%\s*(?:\+|yield|return|apy|apr)",
+    re.IGNORECASE,
+)
 _ASSET_KEYWORDS: dict[str, tuple[str, ...]] = {
     "revenue_share": (
         "revenue share", "revenue-share", "rev share", "rev-share", "franchise revenue",
@@ -133,6 +166,20 @@ def _enrich_intent(intent: InvestmentIntent, message: str) -> InvestmentIntent:
                 updates["asset_kind"] = kind
                 break
 
+    if intent.asset_class is None:
+        for cls, keywords in _CLASS_KEYWORDS.items():
+            if any(k in text for k in keywords):
+                updates["asset_class"] = cls
+                break
+
+    # Only an explicit floor ("minimum 2%") filters by yield; a vague "high-yield"
+    # imposes no hard cutoff — results are already sorted yield-high-first, so a
+    # default floor would just hide whole classes (e.g. real estate rarely clears 8%).
+    if intent.min_yield_pct is None:
+        m = _YIELD_RE.search(message)
+        if m:
+            updates["min_yield_pct"] = float(m.group(1) or m.group(2))
+
     return intent.model_copy(update=updates) if updates else intent
 
 
@@ -157,6 +204,8 @@ def intent_to_filter(intent: InvestmentIntent) -> DealFilter:
     return DealFilter(
         jurisdiction=intent.jurisdiction,
         risk_tier=intent.risk_tier,
+        min_yield_pct=intent.min_yield_pct,
+        asset_class=intent.asset_class,
         # If the user named an amount, only surface deals they can actually enter.
         max_min_investment_minor=intent.amount_minor,
     )

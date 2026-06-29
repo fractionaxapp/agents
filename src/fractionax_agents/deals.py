@@ -99,6 +99,7 @@ def source_deals(deal_filter: DealFilter | None = None) -> list[Deal]:
             for d in deals
             if (f.jurisdiction is None or d.jurisdiction == f.jurisdiction)
             and (f.risk_tier is None or d.risk_tier == f.risk_tier)
+            and (f.asset_class is None or d.asset_class == f.asset_class)
             and (f.min_yield_pct is None or d.projected_yield_pct >= f.min_yield_pct)
             and (
                 f.max_min_investment_minor is None

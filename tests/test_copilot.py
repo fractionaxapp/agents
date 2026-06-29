@@ -54,12 +54,17 @@ def test_enrich_fills_fields_the_model_missed() -> None:
     assert enriched.risk_tier == "low"
 
 
-def test_enrich_parses_amount_and_asset_kind() -> None:
+def test_enrich_parses_amount_class_and_yield() -> None:
     enriched = _enrich_intent(
-        InvestmentIntent(action="discover"), "Show me high-yield revenue-share deals under $2.5k"
+        InvestmentIntent(action="discover"),
+        "Show me high-yield revenue-share deals with minimum 2% yield under $2.5k",
     )
     assert enriched.amount_minor == 250_000
-    assert enriched.risk_tier == "high"
+    # "high-yield" is a yield signal, not a risk signal — risk stays unset.
+    assert enriched.risk_tier is None
+    # An explicit floor sets min_yield_pct; revenue-share maps to the rwa class.
+    assert enriched.min_yield_pct == 2.0
+    assert enriched.asset_class == "specialty-finance"
     assert enriched.asset_kind == "revenue_share"
 
 
