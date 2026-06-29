@@ -7,6 +7,7 @@ calls to narrow opportunities by the user's intent.
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 from fractionax_core import Asset, Deal, DealFilter
@@ -116,6 +117,19 @@ ASSETS_BY_ID: dict[str, Asset] = {a.id: a for a in SEED_ASSETS}
 SEED_DEALS: list[Deal] = _load_catalogue_seed()
 
 
+def _title_matches(query: str, title: str) -> bool:
+    """True if ``title`` is the deal the user named — exact/substring either way, or
+    a strong token overlap (so minor wording differences still resolve)."""
+    q, t = query.strip().lower(), title.lower()
+    if not q:
+        return False
+    if q in t or t in q:
+        return True
+    q_tokens = set(re.findall(r"[a-z0-9]+", q))
+    t_tokens = set(re.findall(r"[a-z0-9]+", t))
+    return bool(q_tokens) and len(q_tokens & t_tokens) / len(q_tokens) >= 0.6
+
+
 def source_deals(deal_filter: DealFilter | None = None) -> list[Deal]:
     """Aggregate and filter opportunities by yield, risk, and jurisdiction.
 
@@ -126,6 +140,13 @@ def source_deals(deal_filter: DealFilter | None = None) -> list[Deal]:
     deals = list(SEED_DEALS)
     if deal_filter is not None:
         f = deal_filter
+        # A specifically named deal takes precedence over the broad filters — return
+        # just the matches so the Copilot underwrites the deal the user asked about.
+        if f.title_query:
+            matched = [d for d in deals if _title_matches(f.title_query, d.title)]
+            if matched:
+                return sorted(matched, key=lambda d: d.projected_yield_pct, reverse=True)
+            # No title match — fall through to the broad filters rather than strand.
         deals = [
             d
             for d in deals

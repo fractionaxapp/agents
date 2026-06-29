@@ -61,6 +61,19 @@ def test_every_deal_has_an_asset_class() -> None:
     assert SEED_DEALS and all(d.asset_class for d in SEED_DEALS)
 
 
+def test_source_deals_matches_a_named_deal() -> None:
+    target = SEED_DEALS[5].title
+    deals = source_deals(DealFilter(title_query=target))
+    # The named deal is surfaced, and it narrows the set rather than returning all.
+    assert deals and any(d.title == target for d in deals)
+    assert len(deals) < len(SEED_DEALS)
+
+
+def test_title_query_falls_back_when_nothing_matches() -> None:
+    deals = source_deals(DealFilter(title_query="no such deal exists anywhere"))
+    assert len(deals) == len(SEED_DEALS)  # unmatched name -> don't strand the result
+
+
 def test_deals_endpoint_filters() -> None:
     resp = client.get("/deals", params={"risk_tier": "high"})
     assert resp.status_code == 200

@@ -57,8 +57,14 @@ INTENT_SYSTEM = (
     "Set it whenever an asset type is named.\n"
     "- asset_kind: legacy hint; set when clear (royalties/IP -> ip_royalty, invoices -> "
     "invoice, revenue-share -> revenue_share) but prefer asset_class for filtering.\n"
+    "- title_query: the proper name of a SPECIFIC deal/fund the user references (e.g. "
+    "'draft a memo for Blockchain Capital III Digital Liquid Venture Fund' -> "
+    "title_query='Blockchain Capital III Digital Liquid Venture Fund'). Use the verbatim "
+    "name; leave null for a category (e.g. 'real estate deals') — that is asset_class.\n"
     "\n"
     "Examples:\n"
+    "- 'Draft an investment memo for Acme Senior Credit Fund' -> action=discover, "
+    "title_query='Acme Senior Credit Fund'.\n"
     "- 'Invest $1,000 in low-risk Malaysian opportunities' -> action=invest, "
     "amount_minor=100000, currency=USD, jurisdiction=MY, risk_tier=low.\n"
     "- 'Show me high-yield revenue-share deals with minimum 2% yield' -> action=discover, "
@@ -120,6 +126,8 @@ _YIELD_RE = re.compile(
     r"|(\d+(?:\.\d+)?)\s*%\s*(?:\+|yield|return|apy|apr)",
     re.IGNORECASE,
 )
+# A specific deal named after "memo for"/"underwrite" (the deal-card "Draft memo" link).
+_TITLE_RE = re.compile(r"\b(?:memo for|underwrite)\s+(.+?)\s*$", re.IGNORECASE)
 _ASSET_KEYWORDS: dict[str, tuple[str, ...]] = {
     "revenue_share": (
         "revenue share", "revenue-share", "rev share", "rev-share", "franchise revenue",
@@ -137,6 +145,11 @@ def _enrich_intent(intent: InvestmentIntent, message: str) -> InvestmentIntent:
     """Fill high-confidence fields the model left unset, from the raw message."""
     text = message.lower()
     updates: dict[str, Any] = {}
+
+    if intent.title_query is None:
+        m = _TITLE_RE.search(message)
+        if m:
+            updates["title_query"] = m.group(1).strip()
 
     if intent.amount_minor is None:
         m = _AMOUNT_RE.search(message)
@@ -206,6 +219,7 @@ def intent_to_filter(intent: InvestmentIntent) -> DealFilter:
         risk_tier=intent.risk_tier,
         min_yield_pct=intent.min_yield_pct,
         asset_class=intent.asset_class,
+        title_query=intent.title_query,
         # If the user named an amount, only surface deals they can actually enter.
         max_min_investment_minor=intent.amount_minor,
     )
@@ -217,10 +231,11 @@ def run_copilot(message: str, *, with_memo: bool = True) -> CopilotResult:
     deals = source_deals(intent_to_filter(intent))
 
     memo: InvestmentMemo | None = None
-    if with_memo and deals and intent.action in ("invest", "discover"):
+    if with_memo and deals and (intent.action in ("invest", "discover") or intent.title_query):
         top = deals[0]
-        # Underwrite the top match. Catalogue deals have no typed asset, so the memo
-        # falls back to the deal-implied (par) NAV inside generate_memo.
+        # Underwrite the top match (a named deal is matched first, so it leads).
+        # Catalogue deals have no typed asset, so the memo falls back to the
+        # deal-implied (par) NAV inside generate_memo.
         memo = generate_memo(top, ASSETS_BY_ID.get(top.asset_id))
 
     return CopilotResult(intent=intent, deals=deals, memo=memo)
@@ -238,7 +253,7 @@ def stream_copilot(message: str, *, with_memo: bool = True) -> Iterator[tuple[st
     deals = source_deals(intent_to_filter(intent))
     yield "deals", [d.model_dump() for d in deals]
 
-    if with_memo and deals and intent.action in ("invest", "discover"):
+    if with_memo and deals and (intent.action in ("invest", "discover") or intent.title_query):
         top = deals[0]
         yield "memo", generate_memo(top, ASSETS_BY_ID.get(top.asset_id)).model_dump()
 

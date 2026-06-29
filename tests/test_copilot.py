@@ -54,6 +54,14 @@ def test_enrich_fills_fields_the_model_missed() -> None:
     assert enriched.risk_tier == "low"
 
 
+def test_enrich_extracts_a_named_deal() -> None:
+    enriched = _enrich_intent(
+        InvestmentIntent(action="discover"),
+        "Draft an investment memo for Acme Senior Credit Fund",
+    )
+    assert enriched.title_query == "Acme Senior Credit Fund"
+
+
 def test_enrich_parses_amount_class_and_yield() -> None:
     enriched = _enrich_intent(
         InvestmentIntent(action="discover"),
