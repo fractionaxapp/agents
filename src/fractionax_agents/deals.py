@@ -1,24 +1,19 @@
-"""Deal Sourcing Agent core: a seed catalogue of alternative-asset opportunities
-plus deterministic aggregation/filtering. The seed data stands in for live
-sourcing connectors until those land; the filtering logic is what the Copilot
+"""Deal Sourcing Agent core: the deal catalogue (served from the database) plus
+deterministic aggregation/filtering. The catalogue is populated by the super-admin
+import (rwa.xyz asset-screener export); the filtering logic is what the Copilot
 calls to narrow opportunities by the user's intent.
 """
 
 from __future__ import annotations
 
-import json
 import re
-from pathlib import Path
 
 from fractionax_core import Asset, Deal, DealFilter
 from fractionax_core.domain import InvoiceAsset, IpRoyaltyAsset, RevenueShareAsset, RiskTier
 
-# A dated rwa.xyz snapshot used to seed the discovery catalogue for the demo.
-# These deals have no backing Asset; the Copilot underwrites them from a
-# deal-implied NAV. Replaced by a licensed live connector in Milestone 2.
-_SEED_FILE = Path(__file__).with_name("seed_deals.json")
+from . import db
 
-# The seed's risk_tier is a class-level anchor (assigned from the asset class).
+# A deal's risk_tier is a class-level anchor (assigned from the asset class).
 # Refine it with per-deal signals so deals within a class aren't uniform, capping
 # the move at one tier so the class stays the dominant signal. (A coarse stand-in
 # until the licensed feed carries real per-issuer risk.)
@@ -42,22 +37,6 @@ def _refine_risk(base: RiskTier, yield_pct: float, target_raise_minor: int) -> R
     delta = max(-1, min(1, delta))
     return _RISK_TIERS[max(0, min(len(_RISK_TIERS) - 1, _RISK_TIERS.index(base) + delta))]
 
-
-def _load_catalogue_seed() -> list[Deal]:
-    if not _SEED_FILE.exists():
-        return []
-    try:
-        deals = [Deal(**row) for row in json.loads(_SEED_FILE.read_text())]
-    except (ValueError, OSError):
-        return []
-    return [
-        d.model_copy(
-            update={
-                "risk_tier": _refine_risk(d.risk_tier, d.projected_yield_pct, d.target_raise_minor)
-            }
-        )
-        for d in deals
-    ]
 
 # --- Seed assets (one per supported alternative-asset class) ---------------
 
@@ -111,10 +90,55 @@ SEED_ASSETS: list[Asset] = [
 
 ASSETS_BY_ID: dict[str, Asset] = {a.id: a for a in SEED_ASSETS}
 
-# --- Seed deals -------------------------------------------------------------
-# Deal discovery is served entirely from the dated rwa.xyz catalogue snapshot.
+# --- Deal catalogue (database-backed) ---------------------------------------
+# Discovery is served directly from the database — there is no bundled seed/JSON
+# fallback. The catalogue is empty until the super-admin imports one.
 
-SEED_DEALS: list[Deal] = _load_catalogue_seed()
+
+def _refine_all(deals: list[Deal]) -> list[Deal]:
+    return [
+        d.model_copy(
+            update={
+                "risk_tier": _refine_risk(d.risk_tier, d.projected_yield_pct, d.target_raise_minor)
+            }
+        )
+        for d in deals
+    ]
+
+
+# In-process cache of the catalogue, invalidated on import/reset. Avoids a DB
+# round-trip per /deals request (single-worker demo; fine to hold in memory).
+_catalogue_cache: list[Deal] | None = None
+
+
+def get_catalogue() -> list[Deal]:
+    """The deal catalogue, read directly from the database (empty if none imported)."""
+    global _catalogue_cache
+    if _catalogue_cache is None:
+        _catalogue_cache = _refine_all(db.load_deals())
+    return _catalogue_cache
+
+
+def set_catalogue(deals: list[Deal]) -> int:
+    """Store an imported catalogue in the database (replacing the current one) and
+    append one snapshot per deal. Deals are stored with their base (class-anchored)
+    risk tier; ``get_catalogue`` refines on read. Returns the count."""
+    global _catalogue_cache
+    count = db.replace_catalogue(deals)
+    _catalogue_cache = None
+    return count
+
+
+def clear_catalogue() -> None:
+    """Remove all deals from the database. Snapshot history is retained."""
+    global _catalogue_cache
+    db.clear_deals()
+    _catalogue_cache = None
+
+
+def catalogue_source() -> str:
+    """'database' when the catalogue holds deals, else 'empty'."""
+    return "database" if db.count_deals() > 0 else "empty"
 
 
 def _title_matches(query: str, title: str) -> bool:
@@ -137,7 +161,7 @@ def source_deals(deal_filter: DealFilter | None = None) -> list[Deal]:
     a parsed intent into a ``DealFilter`` and calls this. Results are sorted by
     projected yield (descending) so the best opportunities surface first.
     """
-    deals = list(SEED_DEALS)
+    deals = list(get_catalogue())
     if deal_filter is not None:
         f = deal_filter
         # A specifically named deal takes precedence over the broad filters — return

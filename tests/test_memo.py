@@ -6,7 +6,7 @@ from __future__ import annotations
 import pytest
 from fractionax_core.domain import Deal, InvestmentMemo, MemoRisk
 
-from fractionax_agents.deals import SEED_ASSETS, SEED_DEALS
+from fractionax_agents.deals import SEED_ASSETS
 from fractionax_agents.memo import generate_memo
 from fractionax_agents.oracle import FundamentalNavOracle, illiquidity_adjusted_valuation
 
@@ -64,7 +64,20 @@ def test_memo_underwrites_a_catalogue_deal_without_an_asset(
     """Discovery deals carry no typed asset; the memo uses the deal-implied par NAV."""
     monkeypatch.setattr("fractionax_agents.memo.extract", _fake_memo)
 
-    deal = SEED_DEALS[0]
+    deal = Deal(
+        id="deal_rwa_1",
+        asset_id="ast_rwa_1",
+        title="Catalogue deal without a typed asset",
+        jurisdiction="SV",
+        currency="USD",
+        min_investment_minor=10_000_000,
+        target_raise_minor=5_000_000_000,
+        projected_yield_pct=0.0,
+        risk_tier="low",
+        status="open",
+        asset_class="stablecoins",
+        sourced_at="2026-01-01T00:00:00.000Z",
+    )
     expected = illiquidity_adjusted_valuation(deal.target_raise_minor, deal.risk_tier)
 
     memo = generate_memo(deal)  # no asset

@@ -32,6 +32,18 @@ class Settings(BaseSettings):
     host: str = "0.0.0.0"
     port: int = 8000
 
+    # ADMIN_API_KEY — shared key the web dashboard sends (X-Admin-Key header) to
+    # reach admin-only endpoints (investor directory, decision log). When unset,
+    # admin endpoints are disabled (503) so they are never inadvertently open.
+    admin_api_key: str | None = None
+    # File that backs the admin store (investors + decision log). Defaults to
+    # admin_store.json next to the package data.
+    admin_store_path: str | None = None
+    # Relational database for the deal catalogue + import snapshots (timeseries).
+    # Postgres (Neon/Render) in deploy, e.g. postgresql://user:pass@host/db; when
+    # unset, falls back to a local SQLite file (sqlite:///fractionax.db).
+    database_url: str | None = None
+
 
 @lru_cache
 def get_settings() -> Settings:
